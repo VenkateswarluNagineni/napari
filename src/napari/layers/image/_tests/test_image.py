@@ -223,6 +223,28 @@ def test_error_non_rgb_image(shape):
         Image(data, rgb=True)
 
 
+@pytest.mark.parametrize('param', ['scale', 'translate'])
+def test_rgb_transform_param_includes_color_dim(param):
+    """Test that a clear error is raised when `scale`/`translate` includes
+    a value for the auto-detected RGB(A) color dimension (issue #7298),
+    instead of the opaque broadcast error that used to reach the user.
+    """
+    shape = (2, 128, 128, 3)
+    data = np.zeros(shape)
+    with pytest.raises(ValueError, match=f"'{param}'.*length 4"):
+        Image(data, **{param: [1.0] * 4})
+
+    # one value per *spatial* dimension (excluding color) is still valid
+    layer = Image(data, **{param: [1.0] * 3})
+    assert layer.ndim == 3
+
+    # explicitly disabling RGB interpretation restores the full-length
+    # parameter as valid, since every dimension is then a spatial one
+    layer = Image(data, rgb=False, **{param: [1.0] * 4})
+    assert layer.ndim == 4
+    assert layer.rgb is False
+
+
 def test_changing_image():
     """Test changing Image data."""
     shape_a = (10, 15)

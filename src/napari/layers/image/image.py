@@ -301,6 +301,23 @@ class Image(IntensityVisualizationMixin, ScalarFieldBase):
             rgb = guess_rgb(data_shape)
 
         self.rgb = rgb
+        ndim = len(data_shape) - 1 if rgb else len(data_shape)
+        if rgb:
+            # The trailing (color) dimension is not a regular spatial
+            # dimension, so `scale`/`translate` must not include it. Without
+            # this check a value of length `len(data_shape)` reaches
+            # `scale_to_vector`/`translate_to_vector`, which fails with an
+            # opaque `could not broadcast input array` error (issue #7298).
+            for name_, value in (('scale', scale), ('translate', translate)):
+                if value is not None and len(value) > ndim:
+                    raise ValueError(
+                        f"This image is being interpreted as RGB(A), so it "
+                        f"has {ndim} spatial dimension(s), but '{name_}' has "
+                        f"length {len(value)}. Pass '{name_}' values "
+                        f"excluding the final (color) dimension, or pass "
+                        f"rgb=False to treat it as a regular spatial "
+                        f"dimension instead."
+                    )
         super().__init__(
             data,
             affine=affine,
@@ -313,7 +330,7 @@ class Image(IntensityVisualizationMixin, ScalarFieldBase):
             metadata=metadata,
             multiscale=multiscale,
             name=name,
-            ndim=len(data_shape) - 1 if rgb else len(data_shape),
+            ndim=ndim,
             opacity=opacity,
             plane=plane,
             projection_mode=projection_mode,
